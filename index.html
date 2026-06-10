@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="proj-title"       content="SchulDashboard" />
+  <meta name="proj-color"       content="#0ea5e9" />
+  <meta name="proj-color-rgb"   content="14,165,233" />
+  <meta name="proj-description" content="Serverless school dashboard — WebUntis, school clouds, email and AI in one place." />
+  <meta name="proj-tag"         content="Web App / Firebase" />
+  <title>SchulDashboard</title>
+  <link rel="stylesheet" href="css/app.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app":       "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js",
+      "firebase/auth":      "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js",
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- ── Auth overlay ──────────────────────────────── -->
+  <div id="auth-overlay" class="overlay">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-logo">SchulDashboard</div>
+        <p>Schulplaner, Clouds und E-Mails an einem Ort</p>
+      </div>
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Anmelden</button>
+        <button class="auth-tab" data-tab="register">Registrieren</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <div id="login-error" class="auth-error"></div>
+        <div class="field">
+          <label for="login-email">E-Mail</label>
+          <input type="email" id="login-email" placeholder="mail@example.com"
+                 autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="login-pw">Passwort</label>
+          <input type="password" id="login-pw" placeholder="••••••••"
+                 autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="btn btn-primary" id="login-btn" style="width:100%">
+          Anmelden
+        </button>
+      </form>
+
+      <form id="register-form" class="auth-form hidden">
+        <div id="register-error" class="auth-error"></div>
+        <div class="field">
+          <label for="reg-email">E-Mail</label>
+          <input type="email" id="reg-email" placeholder="mail@example.com"
+                 autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="reg-pw">Account-Passwort</label>
+          <input type="password" id="reg-pw" placeholder="Min. 6 Zeichen"
+                 autocomplete="new-password" required minlength="6" />
+        </div>
+        <div class="field">
+          <label for="reg-master">Master-Passwort</label>
+          <input type="password" id="reg-master" placeholder="Verschlüsselt deine Zugangsdaten"
+                 autocomplete="off" required />
+        </div>
+        <div class="field">
+          <label for="reg-master2">Master-Passwort bestätigen</label>
+          <input type="password" id="reg-master2" placeholder="••••••••"
+                 autocomplete="off" required />
+        </div>
+        <p class="field-hint">Das Master-Passwort verschlüsselt alle gespeicherten Zugangsdaten
+          (WebUntis, E-Mail, …). Es wird <strong>nie</strong> auf dem Server gespeichert —
+          bei Verlust ist der Zugriff auf deine Daten permanent verloren.</p>
+        <button type="submit" class="btn btn-primary" id="reg-btn" style="width:100%">
+          Konto erstellen
+        </button>
+      </form>
+
+      <div class="auth-divider">oder</div>
+      <div style="padding:0 32px 28px">
+        <button type="button" class="btn btn-google" id="google-btn" style="width:100%">
+          <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Weiter mit Google
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Master-password overlay ───────────────────── -->
+  <div id="master-overlay" class="overlay hidden">
+    <div class="master-card">
+      <svg id="master-lock-icon" width="28" height="28" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      <h2 id="master-title">Dashboard entsperren</h2>
+      <p class="hint" id="master-hint">Gib dein Master-Passwort ein, um deine verschlüsselten
+        Zugangsdaten zu entschlüsseln. Es verlässt niemals dieses Gerät.</p>
+      <div id="master-error" class="master-error"></div>
+      <form id="master-form" style="width:100%;display:flex;flex-direction:column;gap:12px">
+        <div class="field">
+          <label for="master-pw">Master-Passwort</label>
+          <input type="password" id="master-pw" placeholder="••••••••" autocomplete="off" required />
+        </div>
+        <div class="field hidden" id="master-pw2-field">
+          <label for="master-pw2">Bestätigen</label>
+          <input type="password" id="master-pw2" placeholder="••••••••" autocomplete="off" />
+        </div>
+        <button type="submit" class="btn btn-primary" id="master-btn" style="width:100%">
+          Entsperren
+        </button>
+      </form>
+      <button id="master-logout-btn" class="btn btn-ghost"
+              style="font-size:0.8rem;width:100%">
+        Anderes Konto verwenden
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Dashboard ─────────────────────────────────── -->
+  <div id="dashboard">
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">SchulDashboard</div>
+        <div class="sidebar-user" id="sidebar-email"></div>
+      </div>
+      <nav class="sidebar-nav" aria-label="Navigation">
+        <span class="nav-section">Überblick</span>
+        <button class="nav-item active" data-view="home">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          Übersicht
+        </button>
+        <span class="nav-section">Module</span>
+        <button class="nav-item" data-view="stundenplan">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          Stundenplan
+        </button>
+        <button class="nav-item disabled" title="Kommt in Phase 4">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          Nachrichten
+        </button>
+        <button class="nav-item disabled" title="Kommt in Phase 5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+          E-Mail
+        </button>
+        <button class="nav-item disabled" title="Kommt in Phase 6">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          Kalender
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="nav-item" data-view="settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0
+              1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0
+              0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33
+              l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15
+              a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0
+              4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83
+              0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2
+              2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2
+              2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65
+              0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          Einstellungen
+        </button>
+        <button class="nav-item" id="logout-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Abmelden
+        </button>
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <header class="topbar">
+        <button class="btn btn-ghost mobile-menu-btn" id="mobile-menu-btn" aria-label="Menü">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <h1 id="topbar-title">Übersicht</h1>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost" id="theme-toggle" style="padding:7px 10px"></button>
+          <span class="topbar-email" id="topbar-email"></span>
+        </div>
+      </header>
+
+      <div class="content-area" id="view-home">
+        <div class="home-header">
+          <h2 id="home-date">Übersicht</h2>
+          <button class="btn btn-ghost sp-refresh-btn" id="home-refresh" title="Neu laden">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+          </button>
+        </div>
+        <div id="home-timetable" class="sp-widget">
+          <div class="sp-loading">Stundenplan wird geladen…</div>
+        </div>
+      </div>
+
+      <div class="content-area hidden" id="view-settings">
+        <h2 style="margin-bottom:24px">Einstellungen</h2>
+
+        <!-- Services -->
+        <div style="max-width:560px;margin-bottom:24px">
+          <div class="settings-group-header">
+            <h3>Dienste</h3>
+            <button class="btn btn-ghost" style="font-size:0.8rem" id="settings-setup-btn">
+              Alle einrichten
+            </button>
+          </div>
+          <div id="services-list" class="services-grid"></div>
+        </div>
+
+        <!-- Appearance -->
+        <div class="card" style="max-width:560px;margin-bottom:16px">
+          <h3 style="margin-bottom:4px">Erscheinungsbild</h3>
+          <div class="accent-row">
+            <div>
+              <div class="accent-row-label">Akzentfarbe</div>
+              <div class="accent-row-sub">Buttons, aktive Elemente und Highlights</div>
+            </div>
+            <input type="color" id="accent-picker" value="#0ea5e9" />
+          </div>
+        </div>
+
+        <!-- Account -->
+        <div class="card" style="max-width:560px">
+          <h3 style="margin-bottom:16px">Konto</h3>
+          <div class="settings-row">
+            <div class="settings-key">Angemeldet als</div>
+            <div class="settings-val" id="settings-email">-</div>
+          </div>
+          <div class="settings-row" style="border-bottom:none;padding-top:16px;display:flex;gap:10px">
+            <button class="btn btn-danger" id="settings-logout-btn">Abmelden</button>
+            <button class="btn btn-ghost" id="settings-delete-btn" style="color:var(--danger);border-color:var(--danger)">Konto löschen</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stundenplan view -->
+      <div class="content-area hidden" id="view-stundenplan">
+        <div class="sp-view-header">
+          <div class="sp-tabs">
+            <button class="sp-tab active" id="sp-tab-heute">Heute</button>
+            <button class="sp-tab" id="sp-tab-woche">Diese Woche</button>
+          </div>
+          <button class="btn btn-ghost sp-refresh-btn" id="sp-refresh" title="Neu laden">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+          </button>
+        </div>
+        <div class="sp-widget" id="sp-panel-heute"></div>
+        <div class="sp-widget hidden" id="sp-panel-woche"></div>
+      </div>
+
+      <!-- Onboarding wizard -->
+      <div class="content-area hidden" id="view-onboarding">
+        <div class="wizard">
+          <div class="wizard-progress" id="wizard-progress"></div>
+          <h2 id="wizard-title"></h2>
+          <p class="text-muted" id="wizard-subtitle" style="margin-top:4px;font-size:0.875rem"></p>
+          <div id="wizard-body"></div>
+          <div class="wizard-footer">
+            <button class="btn btn-ghost" id="wizard-skip">Überspringen</button>
+            <div style="flex:1"></div>
+            <button class="btn btn-ghost hidden" id="wizard-prev">Zurück</button>
+            <button class="btn btn-primary" id="wizard-next">Weiter</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
