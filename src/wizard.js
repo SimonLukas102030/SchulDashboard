@@ -6,8 +6,8 @@ export const SERVICES = [
     label: 'WebUntis',
     desc: 'Stundenplan & Vertretungen',
     fields: [
-      { key: 'serverUrl', label: 'Server-URL',   type: 'url',      placeholder: 'https://mese.webuntis.com' },
-      { key: 'school',    label: 'Schule',        type: 'text',     placeholder: 'z.B. bbs1-mainz' },
+      { key: 'serverUrl', label: 'Server-URL',   type: 'url',      placeholder: 'https://bertolt-brecht.webuntis.com', default: 'https://bertolt-brecht.webuntis.com' },
+      { key: 'school',    label: 'Schule',        type: 'text',     placeholder: 'bertolt-brecht', default: 'bertolt-brecht' },
       { key: 'username',  label: 'Benutzername',  type: 'text',     placeholder: '' },
       { key: 'password',  label: 'Passwort',      type: 'password', placeholder: '••••••••' },
     ],
@@ -60,10 +60,14 @@ export function createWizard({ uid, key, bodyEl, titleEl, subtitleEl, progressEl
 
   async function prefill(step) {
     const existing = await loadCredential(uid, key, step.id).catch(() => null);
-    if (!existing) return;
     for (const f of step.fields) {
       const el = document.getElementById(`wz-${f.key}`);
-      if (el) el.value = existing[f.key] ?? '';
+      if (!el) continue;
+      if (existing) {
+        el.value = existing[f.key] ?? '';
+      } else if (f.default) {
+        el.value = f.default;
+      }
     }
   }
 
