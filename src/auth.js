@@ -5,7 +5,8 @@ import {
   signOut as fbSignOut,
   onAuthStateChanged as fbOnAuthStateChanged,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   deleteUser,
 } from 'firebase/auth';
 import {
@@ -71,10 +72,28 @@ export async function signIn(email, password) {
   await signInWithEmailAndPassword(auth, email, password);
 }
 
+// Initiates Google OAuth redirect — page navigates away, nothing below runs.
 export async function signInWithGoogle() {
-  const result = await signInWithPopup(auth, googleProvider);
-  const snap   = await getDoc(doc(db, 'users', result.user.uid));
-  return { isNewUser: !snap.exists() };
+  await signInWithRedirect(auth, googleProvider);
+}
+
+// Called once on page load to collect the result after a Google redirect.
+// Returns { user, isNewUser } or null if not a redirect landing.
+export async function handleGoogleRedirect() {
+  const result = await getRedirectResult(auth);
+  if (!result) return null;
+  const snap = await getDoc(doc(db, 'users', result.user.uid));
+  return { user: result.user, isNewUser: !snap.exists() };
+}
+
+// Returns true when the current Firebase user has a Firestore doc (salt + verify).
+// False means the user exists in Auth but has no master-password setup yet
+// (e.g. freshly created Google account or deleted+recreated account).
+export async function checkHasUserDoc() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return false;
+  const snap = await getDoc(doc(db, 'users', uid));
+  return snap.exists();
 }
 
 export async function setupMasterPassword(masterPassword) {
@@ -121,13 +140,12 @@ export async function signOut() {
 export async function deleteAccount() {
   const user = auth.currentUser;
   if (!user) throw new Error('Nicht angemeldet');
-  // Delete all Firestore data first
   const uid      = user.uid;
   const services = await getDocs(collection(db, 'users', uid, 'services'));
   for (const d of services.docs) await deleteDoc(d.ref);
   await deleteDoc(doc(db, 'users', uid));
-  // Delete Firebase Auth account
   _key = null;
+  clearPersistedKey();
   await deleteUser(user);
 }
 

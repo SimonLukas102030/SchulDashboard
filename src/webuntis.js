@@ -1,5 +1,82 @@
 import { WEBUNTIS_PROXY } from './config.js';
 
+// ── Mock data (serverUrl === 'mock://') ───────────────
+const _MOCK_DOW = {
+  1: [
+    { p: 1, su: 'Mathe',      ro: 'R204',       te: 'Hr. Schmidt', c: '' },
+    { p: 2, su: 'Mathe',      ro: 'R204',       te: 'Hr. Schmidt', c: '' },
+    { p: 3, su: 'Deutsch',    ro: 'R101',       te: 'Fr. Müller',  c: '' },
+    { p: 4, su: 'Englisch',   ro: 'R202',       te: 'Fr. Weber',   c: '' },
+    { p: 5, su: 'Geschichte', ro: 'R105',       te: 'Hr. Braun',   c: 'cancelled' },
+    { p: 6, su: 'Sport',      ro: 'Sporthalle', te: 'Hr. Fischer', c: '' },
+  ],
+  2: [
+    { p: 1, su: 'Physik',     ro: 'R310', te: 'Hr. Klein',  c: '' },
+    { p: 2, su: 'Bio',        ro: 'R308', te: 'Fr. Lange',  c: '' },
+    { p: 3, su: 'Chemie',     ro: 'R307', te: 'Fr. Wolf',   c: 'irregular' },
+    { p: 4, su: 'Informatik', ro: 'R405', te: 'Hr. Schulz', c: '' },
+    { p: 5, su: 'Informatik', ro: 'R405', te: 'Hr. Schulz', c: '' },
+    { p: 6, su: 'PB',         ro: 'R103', te: 'Hr. Braun',  c: '' },
+  ],
+  3: [
+    { p: 1, su: 'Deutsch',  ro: 'R101',      te: 'Fr. Müller',  c: '' },
+    { p: 2, su: 'Mathe',    ro: 'R204',      te: 'Hr. Schmidt', c: '' },
+    { p: 3, su: 'Englisch', ro: 'R202',      te: 'Fr. Weber',   c: '' },
+    { p: 4, su: 'Englisch', ro: 'R202',      te: 'Fr. Weber',   c: '' },
+    { p: 5, su: 'PB',       ro: 'R103',      te: 'Hr. Braun',   c: '' },
+    { p: 6, su: 'Musik',    ro: 'Musikraum', te: 'Fr. Meyer',   c: '' },
+  ],
+  4: [
+    { p: 1, su: 'Bio',        ro: 'R308',       te: 'Fr. Lange',   c: '' },
+    { p: 2, su: 'Chemie',     ro: 'R307',       te: 'Fr. Wolf',    c: '' },
+    { p: 3, su: 'Geschichte', ro: 'R105',       te: 'Hr. Braun',   c: '' },
+    { p: 4, su: 'Sport',      ro: 'Sporthalle', te: 'Hr. Fischer', c: '' },
+    { p: 5, su: 'Sport',      ro: 'Sporthalle', te: 'Hr. Fischer', c: '' },
+    { p: 6, su: 'Mathe',      ro: 'R204',       te: 'Hr. Schmidt', c: '' },
+  ],
+  5: [
+    { p: 1, su: 'Englisch',   ro: 'R202', te: 'Fr. Weber',   c: '' },
+    { p: 2, su: 'Physik',     ro: 'R310', te: 'Hr. Klein',   c: '' },
+    { p: 3, su: 'Physik',     ro: 'R310', te: 'Hr. Klein',   c: '' },
+    { p: 4, su: 'Informatik', ro: 'R405', te: 'Hr. Schulz',  c: '' },
+    { p: 5, su: 'PB',         ro: 'R103', te: 'Hr. Braun',   c: 'cancelled' },
+  ],
+};
+
+const _MOCK_TIMES = [
+  null,
+  { s: 745,  e: 830  },
+  { s: 830,  e: 915  },
+  { s: 930,  e: 1015 },
+  { s: 1015, e: 1100 },
+  { s: 1115, e: 1200 },
+  { s: 1200, e: 1245 },
+  { s: 1330, e: 1415 },
+  { s: 1415, e: 1500 },
+  { s: 1500, e: 1545 },
+];
+
+function _mockForDate(d) {
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return [];
+  const di = toDateInt(d);
+  return (_MOCK_DOW[dow] ?? []).map(e => {
+    const t = _MOCK_TIMES[e.p];
+    return { date: di, startT: t.s, endT: t.e, start: fmtTime(t.s), end: fmtTime(t.e),
+             subject: e.su, room: e.ro, teacher: e.te,
+             status: e.c === 'cancelled' ? 'cancelled' : e.c === 'irregular' ? 'irregular' : 'normal' };
+  });
+}
+
+function _mockWeek(date = new Date()) {
+  const { mon, fri } = weekBounds(date);
+  const out = [];
+  for (const d = new Date(mon); d <= fri; d.setDate(d.getDate() + 1)) {
+    out.push(..._mockForDate(new Date(d)));
+  }
+  return mergeSamePeriods(out);
+}
+
 let _reqId = 0;
 
 // ── Low-level JSON-RPC via CORS proxy ────────────────
@@ -25,6 +102,7 @@ function rpcTarget(serverUrl, school) {
 
 // ── Public fetch functions ────────────────────────────
 export async function fetchTodayTimetable(creds) {
+  if (creds.serverUrl === 'mock://') return mergeSamePeriods(_mockForDate(new Date()));
   const { serverUrl, school, username, password } = creds;
   const target = rpcTarget(serverUrl, school);
 
@@ -42,6 +120,7 @@ export async function fetchTodayTimetable(creds) {
 }
 
 export async function fetchWeekTimetable(creds, date = new Date()) {
+  if (creds.serverUrl === 'mock://') return _mockWeek(date);
   const { serverUrl, school, username, password } = creds;
   const target = rpcTarget(serverUrl, school);
 

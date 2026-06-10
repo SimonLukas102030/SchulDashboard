@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Preview — SchulDashboard Mock</title>
+  <link rel="stylesheet" href="../css/app.css" />
+  <style>
+    body { padding: 1.5rem; }
+    h2   { margin: 2rem 0 .75rem; color: var(--text-muted); font-size: .85rem;
+           text-transform: uppercase; letter-spacing: .05em; }
+    .banner { background: var(--warning, #f59e0b22); border: 1px solid #f59e0b55;
+              border-radius: 8px; padding: .6rem 1rem; margin-bottom: 1.5rem;
+              color: #f59e0b; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <div class="banner">Mock-Preview — kein Firebase, keine echten Credentials nötig</div>
+
+  <h2>Heute</h2>
+  <div id="today-view" class="sp-widget"></div>
+
+  <h2>Woche</h2>
+  <div id="week-view"></div>
+
+  <script type="module">
+    import { fetchTodayTimetable, fetchWeekTimetable } from '../src/webuntis.js';
+    import { renderTodayWidget, renderWeekView }       from '../src/stundenplan.js';
+
+    const MOCK = { serverUrl: 'mock://', school: '', username: '', password: '' };
+
+    const today = await fetchTodayTimetable(MOCK);
+    renderTodayWidget(document.getElementById('today-view'), today);
+
+    const week = await fetchWeekTimetable(MOCK);
+    renderWeekView(document.getElementById('week-view'), week);
+  </script>
+</body>
+</html>

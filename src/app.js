@@ -1,9 +1,11 @@
 import {
   register, signIn, signInWithGoogle, submitMasterPassword, setupMasterPassword,
-  signOut, deleteAccount, tryRestoreSession,
+  signOut, deleteAccount, tryRestoreSession, handleGoogleRedirect, checkHasUserDoc,
   onAuthStateChanged, getCurrentUser, isSetupInProgress,
   getKey,
 } from './auth.js';
+
+const MOCK_MODE = new URLSearchParams(location.search).has('mock');
 import {
   hasAnyService, loadPrefs, savePrefs,
   hasCredential, deleteCredential, loadCredential,
@@ -143,14 +145,30 @@ async function checkFirstSetup() {
 }
 
 // ── Auth state ────────────────────────────────────────
+// Start redirect-result check immediately so it races with onAuthStateChanged.
+const _redirectResultPromise = handleGoogleRedirect().catch(() => null);
+
 onAuthStateChanged(async user => {
-  if (isSetupInProgress() || _googleInProgress) return;
+  if (isSetupInProgress()) return;
+  const redirectResult = await _redirectResultPromise;
+  if (redirectResult) {
+    // Returning from Google OAuth redirect — show master setup or unlock.
+    showMaster(redirectResult.isNewUser ? 'setup' : 'unlock');
+    return;
+  }
   if (!user) {
     showAuth();
   } else {
     const restored = await tryRestoreSession();
-    if (restored) await showDashboard();
-    else          showMaster();
+    if (restored) {
+      await showDashboard();
+    } else {
+      // Check whether user has a Firestore doc (has gone through master-password setup).
+      // If not (e.g. newly created Google account, or account was deleted + recreated),
+      // show setup mode instead of unlock.
+      const hasDoc = await checkHasUserDoc();
+      showMaster(hasDoc ? 'unlock' : 'setup');
+    }
   }
 });
 
@@ -201,22 +219,13 @@ regForm.addEventListener('submit', async e => {
 });
 
 // ── Google sign-in ────────────────────────────────────
-let _googleInProgress = false;
-
 $('google-btn').addEventListener('click', async () => {
-  _googleInProgress = true;
-  const btn = $('google-btn');
-  setLoading(btn, true);
+  setLoading($('google-btn'), true);
   try {
-    const { isNewUser } = await signInWithGoogle();
-    showMaster(isNewUser ? 'setup' : 'unlock');
+    await signInWithGoogle(); // redirects away — nothing below runs
   } catch (err) {
-    if (err.code !== 'auth/popup-closed-by-user') {
-      toast(authMsg(err.code) ?? err.message, 'error');
-    }
-    setLoading(btn, false);
-  } finally {
-    _googleInProgress = false;
+    toast(authMsg(err.code) ?? err.message, 'error');
+    setLoading($('google-btn'), false);
   }
 });
 
@@ -299,6 +308,7 @@ function invalidateCacheIfStale() {
 }
 
 async function loadWebUntisCreds() {
+  if (MOCK_MODE) return { serverUrl: 'mock://', school: '', username: '', password: '' };
   const uid = getCurrentUser()?.uid;
   const key = getKey();
   if (!uid || !key) return null;
