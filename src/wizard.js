@@ -15,11 +15,11 @@ export const SERVICES = [
   {
     id: 'cloud_gelb',
     label: 'Gelbe Cloud',
-    desc: 'Schul-Cloud (Nachrichten & Dateien)',
+    desc: 'schul.cloud (stashcat) — Nachrichten & Dateien',
+    hint: 'E-Mail-Adresse und Passwort wie beim Login in der schul.cloud App.',
     fields: [
-      { key: 'url',      label: 'URL',           type: 'url',      placeholder: 'https://...' },
-      { key: 'username', label: 'Benutzername',   type: 'text',     placeholder: '' },
-      { key: 'password', label: 'Passwort',       type: 'password', placeholder: '••••••••' },
+      { key: 'email',    label: 'E-Mail',   type: 'email',    placeholder: 'name@schule.de' },
+      { key: 'password', label: 'Passwort', type: 'password', placeholder: '••••••••' },
     ],
   },
   {

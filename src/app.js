@@ -13,6 +13,7 @@ import {
 import { SERVICES, createWizard } from './wizard.js';
 import { fetchTodayTimetable, fetchWeekTimetable } from './webuntis.js';
 import { renderTodayWidget, renderWeekView } from './stundenplan.js';
+import { initCloud, renderCloudGelb, hasSession, teardown as cloudTeardown } from './cloud-gelb.js';
 
 // ── Element refs ──────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -260,6 +261,7 @@ $('master-logout-btn').addEventListener('click', async () => {
 
 // ── Logout ────────────────────────────────────────────
 async function doLogout() {
+  await cloudTeardown().catch(() => {});
   await signOut(); showAuth();
   toast('Abgemeldet.', 'info');
 }
@@ -402,10 +404,51 @@ async function loadWeekForStundenplan() {
   }
 }
 
+// ── Cloud Gelb ────────────────────────────────────────
+async function renderCloudView() {
+  const container = $('cloud-gelb-container');
+  if (!container) return;
+
+  if (hasSession()) {
+    await renderCloudGelb(container);
+    return;
+  }
+
+  const uid = getCurrentUser()?.uid;
+  const key = getKey();
+  if (!uid || !key) { container.innerHTML = '<div class="sp-error">Nicht eingeloggt.</div>'; return; }
+
+  const creds = await loadCredential(uid, key, 'cloud_gelb').catch(() => null);
+  if (!creds?.email || !creds?.password) {
+    container.innerHTML = `<div class="sp-empty">
+      Gelbe Cloud nicht eingerichtet.
+      <button class="btn btn-primary btn-sm" id="cloud-setup-btn" style="margin-top:12px">Einrichten</button>
+    </div>`;
+    $('cloud-setup-btn')?.addEventListener('click', () => {
+      const idx = SERVICES.findIndex(s => s.id === 'cloud_gelb');
+      startWizard(idx);
+    });
+    return;
+  }
+
+  container.innerHTML = '<div class="sp-loading" style="padding:2rem">Verbinde mit Gelber Cloud…</div>';
+  try {
+    await initCloud(creds);
+    await renderCloudGelb(container);
+  } catch (err) {
+    container.innerHTML = `<div class="sp-error" style="padding:2rem">
+      Login fehlgeschlagen: ${err.message}
+      <br><button class="btn btn-ghost btn-sm" id="cloud-retry-btn" style="margin-top:12px">Erneut versuchen</button>
+    </div>`;
+    $('cloud-retry-btn')?.addEventListener('click', renderCloudView);
+  }
+}
+
 // ── View routing ──────────────────────────────────────
 const VIEWS = {
   home:        { el: $('view-home'),         title: 'Übersicht'         },
   stundenplan: { el: $('view-stundenplan'),   title: 'Stundenplan'       },
+  'cloud-gelb':{ el: $('view-cloud-gelb'),   title: 'Gelbe Cloud'       },
   settings:    { el: $('view-settings'),      title: 'Einstellungen'     },
   onboarding:  { el: $('view-onboarding'),    title: 'Dienste einrichten'},
 };
@@ -424,6 +467,7 @@ function navigate(key) {
   topbarTitle.textContent = VIEWS[key]?.title ?? '';
   if (key === 'settings')    renderSettingsServices();
   if (key === 'stundenplan') renderStundenplanPage();
+  if (key === 'cloud-gelb')  renderCloudView();
 }
 
 document.querySelectorAll('[data-view]').forEach(btn => {
