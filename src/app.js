@@ -1,6 +1,6 @@
 import {
   register, signIn, signInWithGoogle, submitMasterPassword, setupMasterPassword,
-  signOut, deleteAccount, tryRestoreSession, handleGoogleRedirect, checkHasUserDoc,
+  signOut, deleteAccount, tryRestoreSession, checkHasUserDoc,
   onAuthStateChanged, getCurrentUser, isSetupInProgress,
   getKey, emergencyReset,
 } from './auth.js';
@@ -159,32 +159,11 @@ async function checkFirstSetup() {
 }
 
 // ── Auth state ────────────────────────────────────────
-// Start redirect-result check immediately so it races with onAuthStateChanged.
-let _redirectError = null;
-const _redirectResultPromise = handleGoogleRedirect().catch(err => {
-  _redirectError = err;
-  return null;
-});
+// _googleInProgress: prevents onAuthStateChanged from racing with the popup handler.
+let _googleInProgress = false;
 
 onAuthStateChanged(async user => {
-  if (isSetupInProgress()) return;
-  const redirectResult = await _redirectResultPromise;
-
-  if (_redirectError) {
-    // Google redirect came back with an error — show it in the auth form.
-    showAuth();
-    const msg = authMsg(_redirectError.code);
-    showErr(loginError, msg ?? _redirectError.message);
-    _redirectError = null; // only show once
-    return;
-  }
-
-  if (redirectResult) {
-    // Returning from Google OAuth redirect — show master setup or unlock.
-    showMaster(redirectResult.isNewUser ? 'setup' : 'unlock');
-    return;
-  }
-
+  if (isSetupInProgress() || _googleInProgress) return;
   if (!user) {
     showAuth();
   } else {
@@ -192,9 +171,6 @@ onAuthStateChanged(async user => {
     if (restored) {
       await showDashboard();
     } else {
-      // Check whether user has a Firestore doc (has gone through master-password setup).
-      // If not (e.g. newly created Google account, or account was deleted + recreated),
-      // show setup mode instead of unlock.
       const hasDoc = await checkHasUserDoc();
       showMaster(hasDoc ? 'unlock' : 'setup');
     }
@@ -249,11 +225,19 @@ regForm.addEventListener('submit', async e => {
 
 // ── Google sign-in ────────────────────────────────────
 $('google-btn').addEventListener('click', async () => {
+  clearErr(loginError);
   setLoading($('google-btn'), true);
+  _googleInProgress = true;
   try {
-    await signInWithGoogle(); // redirects away — nothing below runs
+    const result = await signInWithGoogle();
+    _googleInProgress = false;
+    showMaster(result.isNewUser ? 'setup' : 'unlock');
   } catch (err) {
-    toast(authMsg(err.code) ?? err.message, 'error');
+    _googleInProgress = false;
+    // auth/popup-closed-by-user: user just closed the popup — no error message needed
+    if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+      showErr(loginError, authMsg(err.code) ?? err.message);
+    }
     setLoading($('google-btn'), false);
   }
 });
