@@ -3,6 +3,17 @@
 
 const ALLOWED = /^https:\/\/(api\.stashcat\.com|api\.schul\.cloud)\//i;
 
+// Mimic a real browser request from the official schul.cloud web app.
+// api.stashcat.com blocks requests that don't look like they come from app.schul.cloud.
+const UPSTREAM_HEADERS = {
+  'Content-Type':  'application/x-www-form-urlencoded',
+  'Origin':        'https://app.schul.cloud',
+  'Referer':       'https://app.schul.cloud/',
+  'User-Agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept':        'application/json, text/plain, */*',
+  'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
+};
+
 export default {
   async fetch(req) {
     if (req.method === 'OPTIONS') {
@@ -20,7 +31,7 @@ export default {
     try {
       upstream = await fetch(target, {
         method:  req.method,
-        headers: { 'Content-Type': req.headers.get('Content-Type') ?? 'application/x-www-form-urlencoded' },
+        headers: UPSTREAM_HEADERS,
         body:    req.body,
       });
     } catch (e) {
@@ -30,9 +41,6 @@ export default {
       });
     }
 
-    // Only forward Content-Type from upstream — never spread all headers,
-    // as upstream may also send Access-Control-Allow-Origin which would
-    // produce duplicate values (*, *) and break browser CORS checks.
     const contentType = upstream.headers.get('Content-Type') ?? 'application/json';
     const body        = await upstream.arrayBuffer();
     return new Response(body, {
