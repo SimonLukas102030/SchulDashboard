@@ -2,8 +2,14 @@ import {
   register, signIn, signInWithGoogle, submitMasterPassword, setupMasterPassword,
   signOut, deleteAccount, tryRestoreSession, handleGoogleRedirect, checkHasUserDoc,
   onAuthStateChanged, getCurrentUser, isSetupInProgress,
-  getKey,
+  getKey, emergencyReset,
 } from './auth.js';
+
+// ?reset=1 — clears all local state and signs out (recovery for broken auth state)
+if (new URLSearchParams(location.search).has('reset')) {
+  await emergencyReset();
+  history.replaceState({}, '', location.pathname);
+}
 
 const MOCK_MODE = new URLSearchParams(location.search).has('mock');
 import {
@@ -63,16 +69,22 @@ const clearErr = el         => { el.textContent = '';  el.classList.remove('visi
 
 function authMsg(code) {
   const map = {
-    'auth/invalid-email':          'Ungültige E-Mail-Adresse.',
-    'auth/user-not-found':         'Kein Konto mit dieser E-Mail gefunden.',
-    'auth/wrong-password':         'Falsches Passwort.',
-    'auth/invalid-credential':     'E-Mail oder Passwort falsch.',
-    'auth/email-already-in-use':   'Diese E-Mail ist bereits registriert.',
-    'auth/weak-password':          'Passwort zu schwach (min. 6 Zeichen).',
-    'auth/too-many-requests':      'Zu viele Versuche — bitte kurz warten.',
-    'auth/network-request-failed': 'Netzwerkfehler — bitte Verbindung prüfen.',
+    'auth/invalid-email':              'Ungültige E-Mail-Adresse.',
+    'auth/user-not-found':             'Kein Konto mit dieser E-Mail gefunden.',
+    'auth/wrong-password':             'Falsches Passwort.',
+    'auth/invalid-credential':         'E-Mail oder Passwort falsch.',
+    'auth/email-already-in-use':       'Diese E-Mail ist bereits registriert.',
+    'auth/weak-password':              'Passwort zu schwach (min. 6 Zeichen).',
+    'auth/too-many-requests':          'Zu viele Versuche — bitte kurz warten.',
+    'auth/network-request-failed':     'Netzwerkfehler — bitte Verbindung prüfen.',
+    'auth/unauthorized-domain':        'Diese Domain ist in Firebase nicht autorisiert. Bitte in der Firebase Console → Auth → Einstellungen → Autorisierte Domains eintragen.',
+    'auth/operation-not-allowed':      'Google-Login ist in Firebase nicht aktiviert.',
+    'auth/cancelled-popup-request':    'Anmeldung abgebrochen.',
+    'auth/redirect-cancelled-by-user': 'Anmeldung abgebrochen.',
+    'auth/user-disabled':              'Dieses Konto wurde deaktiviert.',
+    'auth/account-exists-with-different-credential': 'Diese E-Mail ist bereits mit einem anderen Anmeldeverfahren verknüpft.',
   };
-  return map[code] ?? `Fehler: ${code ?? 'unbekannt'}`;
+  return map[code] ?? (code ? `Fehler: ${code}` : 'Unbekannter Fehler.');
 }
 
 // ── Screen transitions ────────────────────────────────
@@ -147,16 +159,30 @@ async function checkFirstSetup() {
 
 // ── Auth state ────────────────────────────────────────
 // Start redirect-result check immediately so it races with onAuthStateChanged.
-const _redirectResultPromise = handleGoogleRedirect().catch(() => null);
+let _redirectError = null;
+const _redirectResultPromise = handleGoogleRedirect().catch(err => {
+  _redirectError = err;
+  return null;
+});
 
 onAuthStateChanged(async user => {
   if (isSetupInProgress()) return;
   const redirectResult = await _redirectResultPromise;
+
+  if (_redirectError) {
+    // Google redirect came back with an error — show it in the auth form.
+    showAuth();
+    showErr(loginError, authMsg(_redirectError.code));
+    _redirectError = null; // only show once
+    return;
+  }
+
   if (redirectResult) {
     // Returning from Google OAuth redirect — show master setup or unlock.
     showMaster(redirectResult.isNewUser ? 'setup' : 'unlock');
     return;
   }
+
   if (!user) {
     showAuth();
   } else {

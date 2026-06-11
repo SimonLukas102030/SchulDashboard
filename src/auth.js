@@ -34,8 +34,16 @@ async function restoreKey() {
   return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
 }
 
-function clearPersistedKey() {
+export function clearPersistedKey() {
   sessionStorage.removeItem(SESSION_STORE);
+}
+
+// Clears all local auth state and signs out of Firebase.
+// Use for emergency recovery or when local state is inconsistent.
+export async function emergencyReset() {
+  _key = null;
+  clearPersistedKey();
+  try { await fbSignOut(auth); } catch { /* best-effort */ }
 }
 
 export async function tryRestoreSession() {
