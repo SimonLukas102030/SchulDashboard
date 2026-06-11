@@ -16,16 +16,28 @@ export default {
       return new Response('Forbidden', { status: 403, headers: cors() });
     }
 
-    const upstream = await fetch(target, {
-      method:  req.method,
-      headers: { 'Content-Type': req.headers.get('Content-Type') ?? 'application/x-www-form-urlencoded' },
-      body:    req.body,
-    });
+    let upstream;
+    try {
+      upstream = await fetch(target, {
+        method:  req.method,
+        headers: { 'Content-Type': req.headers.get('Content-Type') ?? 'application/x-www-form-urlencoded' },
+        body:    req.body,
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: `Upstream unreachable: ${e.message}` }), {
+        status:  502,
+        headers: { 'Content-Type': 'application/json', ...cors() },
+      });
+    }
 
-    const body = await upstream.arrayBuffer();
+    // Only forward Content-Type from upstream — never spread all headers,
+    // as upstream may also send Access-Control-Allow-Origin which would
+    // produce duplicate values (*, *) and break browser CORS checks.
+    const contentType = upstream.headers.get('Content-Type') ?? 'application/json';
+    const body        = await upstream.arrayBuffer();
     return new Response(body, {
       status:  upstream.status,
-      headers: { ...Object.fromEntries(upstream.headers), ...cors() },
+      headers: { 'Content-Type': contentType, ...cors() },
     });
   },
 };

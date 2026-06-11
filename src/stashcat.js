@@ -14,8 +14,17 @@ async function post(path, params) {
     body,
   });
 
-  if (!resp.ok) throw new Error(`Proxy-Fehler ${resp.status}`);
-  const data = await resp.json();
+  if (!resp.ok) {
+    const STATUS_MSGS = { 522: 'API nicht erreichbar (Timeout)', 502: 'Proxy-Fehler (Upstream unreachable)', 503: 'API vorübergehend nicht verfügbar' };
+    throw new Error(STATUS_MSGS[resp.status] ?? `Fehler ${resp.status}`);
+  }
+
+  let data;
+  try {
+    data = await resp.json();
+  } catch {
+    throw new Error('Ungültige API-Antwort (kein JSON)');
+  }
 
   if (data.status?.value === 'FAILED') {
     throw new Error(data.status.message ?? data.status.short_message ?? 'stashcat-Fehler');
