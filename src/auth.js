@@ -82,14 +82,33 @@ export async function signIn(email, password) {
 
 // Initiates Google OAuth redirect — page navigates away, nothing below runs.
 export async function signInWithGoogle() {
+  sessionStorage.setItem('sd-google-pending', '1');
   await signInWithRedirect(auth, googleProvider);
 }
 
 // Called once on page load to collect the result after a Google redirect.
 // Returns { user, isNewUser } or null if not a redirect landing.
 export async function handleGoogleRedirect() {
+  const wasPending = sessionStorage.getItem('sd-google-pending') === '1';
+  sessionStorage.removeItem('sd-google-pending');
+
   const result = await getRedirectResult(auth);
-  if (!result) return null;
+
+  if (!result) {
+    if (wasPending) {
+      // Redirect was initiated but came back empty — domain not authorized or extension blocked it.
+      const err = new Error(
+        'Google-Anmeldung fehlgeschlagen (kein Ergebnis zurückgekommen). ' +
+        'Mögliche Ursachen: (1) simonlukas102030.github.io ist in Firebase Console → Auth → ' +
+        'Autorisierte Domains nicht eingetragen. (2) Browser-Extension blockiert die Anmeldung ' +
+        '— im Inkognito-Modus (Strg+Umschalt+N) testen.'
+      );
+      err.code = 'auth/redirect-no-result';
+      throw err;
+    }
+    return null;
+  }
+
   const snap = await getDoc(doc(db, 'users', result.user.uid));
   return { user: result.user, isNewUser: !snap.exists() };
 }

@@ -83,8 +83,9 @@ function authMsg(code) {
     'auth/redirect-cancelled-by-user': 'Anmeldung abgebrochen.',
     'auth/user-disabled':              'Dieses Konto wurde deaktiviert.',
     'auth/account-exists-with-different-credential': 'Diese E-Mail ist bereits mit einem anderen Anmeldeverfahren verknüpft.',
+    'auth/redirect-no-result': null, // message comes from the Error object directly
   };
-  return map[code] ?? (code ? `Fehler: ${code}` : 'Unbekannter Fehler.');
+  return map[code] !== undefined ? map[code] : (code ? `Fehler: ${code}` : 'Unbekannter Fehler.');
 }
 
 // ── Screen transitions ────────────────────────────────
@@ -172,7 +173,8 @@ onAuthStateChanged(async user => {
   if (_redirectError) {
     // Google redirect came back with an error — show it in the auth form.
     showAuth();
-    showErr(loginError, authMsg(_redirectError.code));
+    const msg = authMsg(_redirectError.code);
+    showErr(loginError, msg ?? _redirectError.message);
     _redirectError = null; // only show once
     return;
   }
