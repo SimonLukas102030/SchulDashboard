@@ -7,16 +7,21 @@ const APP_NAME  = 'schul.cloud-browser-Chrome:120.0-4.11.1';
 async function post(path, params) {
   const target = `${API_BASE}/${path}`;
   const body   = new URLSearchParams(params).toString();
+  const init   = { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body };
 
-  const resp = await fetch(`${STASHCAT_PROXY}/?target=${encodeURIComponent(target)}`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
+  // Try direct first — api.stashcat.com is used by a browser SPA (app.schul.cloud),
+  // so it may have CORS open. Cloudflare Workers are blocked (522), so direct is preferred.
+  let resp;
+  try {
+    resp = await fetch(target, init);
+  } catch {
+    // Direct threw (CORS block or DNS fail) — fall back to proxy
+    resp = await fetch(`${STASHCAT_PROXY}/?target=${encodeURIComponent(target)}`, init);
+  }
 
   if (!resp.ok) {
-    const STATUS_MSGS = { 522: 'API nicht erreichbar (Timeout)', 502: 'Proxy-Fehler (Upstream unreachable)', 503: 'API vorübergehend nicht verfügbar' };
-    throw new Error(STATUS_MSGS[resp.status] ?? `Fehler ${resp.status}`);
+    const msgs = { 522: 'API nicht erreichbar (Timeout)', 502: 'Proxy-Fehler', 503: 'API nicht verfügbar' };
+    throw new Error(msgs[resp.status] ?? `Fehler ${resp.status}`);
   }
 
   let data;
