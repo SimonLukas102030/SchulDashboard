@@ -133,6 +133,18 @@ export async function signOut() {
   await fbSignOut(auth);
 }
 
+// Deletes all Firestore data for the current user but keeps the Auth account.
+// Used when the user forgot their master password — loses all encrypted credentials.
+export async function resetMasterPassword() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Nicht angemeldet');
+  const services = await getDocs(collection(db, 'users', uid, 'services'));
+  for (const d of services.docs) await deleteDoc(d.ref);
+  await deleteDoc(doc(db, 'users', uid));
+  _key = null;
+  clearPersistedKey();
+}
+
 export async function deleteAccount() {
   const user = auth.currentUser;
   if (!user) throw new Error('Nicht angemeldet');

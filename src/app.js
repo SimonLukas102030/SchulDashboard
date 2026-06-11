@@ -1,6 +1,6 @@
 import {
   register, signIn, signInWithGoogle, submitMasterPassword, setupMasterPassword,
-  signOut, deleteAccount, tryRestoreSession, checkHasUserDoc,
+  signOut, deleteAccount, resetMasterPassword, tryRestoreSession, checkHasUserDoc,
   onAuthStateChanged, getCurrentUser, isSetupInProgress,
   getKey, emergencyReset,
 } from './auth.js';
@@ -108,6 +108,7 @@ function showMaster(mode = 'unlock') {
   $('master-btn').textContent   = isSetup ? 'Festlegen' : 'Entsperren';
   $('master-pw2-field').classList.toggle('hidden', !isSetup);
   $('master-lock-icon').classList.toggle('hidden', isSetup);
+  $('master-reset-btn').classList.toggle('hidden', isSetup); // only show on unlock
   clearErr(masterError);
   setTimeout(() => $('master-pw')?.focus(), 50);
 }
@@ -269,6 +270,17 @@ masterForm.addEventListener('submit', async e => {
 
 $('master-logout-btn').addEventListener('click', async () => {
   await signOut(); showAuth();
+});
+
+$('master-reset-btn').addEventListener('click', async () => {
+  if (!confirm('Alle gespeicherten Zugangsdaten gehen verloren. Wirklich neu einrichten?')) return;
+  try {
+    await resetMasterPassword();
+    showMaster('setup');
+    toast('Zurückgesetzt. Lege jetzt ein neues Master-Passwort fest.', 'info', 5000);
+  } catch (err) {
+    showErr(masterError, err.message);
+  }
 });
 
 // ── Logout ────────────────────────────────────────────
